@@ -54,37 +54,83 @@ function handleMockRequest(path, options = {}) {
 
   if (path === "/api/v1/users/me") {
     const role = localStorage.getItem("mock_user_role");
-    return role === "admin" ? MOCK_ADMIN_USER : MOCK_STUDENT_USER;
+    const baseUser = role === "admin" ? MOCK_ADMIN_USER : MOCK_STUDENT_USER;
+    if (method === "PATCH") {
+      let body = {};
+      try {
+        body = typeof options.body === "string" ? JSON.parse(options.body) : options.body || {};
+      } catch {}
+      return { ...baseUser, ...body };
+    }
+    return baseUser;
   }
 
   if (path === "/api/v1/users/onboarding-complete") {
-    return { success: true };
+    const role = localStorage.getItem("mock_user_role");
+    const currentUser = role === "admin" ? MOCK_ADMIN_USER : MOCK_STUDENT_USER;
+    const updated = { ...currentUser, is_first_login: false };
+    return {
+      is_first_login: false,
+      user: updated,
+    };
   }
 
   if (path === "/api/v1/users/me/progress") {
     return {
-      level: "A2",
-      xp: 180,
-      streak_days: 4,
-      completed_tasks_count: 3,
-      history: [
+      completed_tasks: 3,
+      average_score: 9.7,
+      records: [
         {
+          id: "prog-1",
+          user_id: "demo-student-uuid",
+          topic_id: "1",
+          task_id: "task-1",
+          score: 10,
           topic_title: "Внешность и характер",
-          task_title: "Задание 1. Соедините картинки со словами",
-          score: 100,
+          task_type: "gamified",
           completed_at: new Date(Date.now() - 3600000).toISOString(),
+          ai_feedback: {
+            feedback: "Отличная работа! Все 12 слов сопоставлены верно.",
+          },
         },
         {
+          id: "prog-2",
+          user_id: "demo-student-uuid",
+          topic_id: "1",
+          task_id: "task-2",
+          score: 10,
           topic_title: "Внешность и характер",
-          task_title: "Задание 2. Прочитайте ситуацию и выберите правильный ответ",
-          score: 100,
+          task_type: "test",
           completed_at: new Date(Date.now() - 1800000).toISOString(),
+          ai_feedback: {
+            feedback: "Идеально! 10 из 10 ситуаций решены верно.",
+          },
+        },
+        {
+          id: "prog-3",
+          user_id: "demo-student-uuid",
+          topic_id: "1",
+          task_id: "task-4",
+          score: 9,
+          topic_title: "Внешность и характер",
+          task_type: "essay",
+          completed_at: new Date(Date.now() - 900000).toISOString(),
+          ai_feedback: {
+            feedback: "Прекрасное эссе о друге с богатой лексикой темы.",
+          },
         },
       ],
     };
   }
 
   if (path.startsWith("/api/v1/topics")) {
+    const tasksMatch = path.match(/^\/api\/v1\/topics\/([^/?]+)\/tasks/);
+    if (tasksMatch) {
+      const topicId = tasksMatch[1];
+      const found = MOCK_TOPICS.find((t) => String(t.id) === String(topicId));
+      return found ? found.tasks : [];
+    }
+
     const topicIdMatch = path.match(/^\/api\/v1\/topics\/([^/?]+)/);
     if (topicIdMatch) {
       const topicId = topicIdMatch[1];
@@ -95,37 +141,133 @@ function handleMockRequest(path, options = {}) {
   }
 
   if (path.includes("/submit")) {
+    const taskIdMatch = path.match(/\/tasks\/([^/?]+)\/submit/);
+    const taskId = taskIdMatch ? taskIdMatch[1] : "task-1";
+    let body = {};
+    if (typeof options.body === "string") {
+      try {
+        body = JSON.parse(options.body);
+      } catch {}
+    } else if (options.body) {
+      body = options.body;
+    }
+
+    let foundTask = null;
+    for (const t of MOCK_TOPICS) {
+      const tk = t.tasks?.find((x) => x.id === taskId);
+      if (tk) {
+        foundTask = tk;
+        break;
+      }
+    }
+
+    if (foundTask?.content?.pairs && body.matches) {
+      const pairs = foundTask.content.pairs;
+      let correctCount = 0;
+      const itemResults = pairs.map((p) => {
+        const submitted = body.matches[p.id] || "";
+        const isOk = submitted.toLowerCase() === p.word.toLowerCase();
+        if (isOk) correctCount++;
+        return {
+          id: p.id,
+          is_correct: isOk,
+          submitted,
+        };
+      });
+      const totalCount = pairs.length;
+      const score = Math.round((correctCount / totalCount) * 10);
+      const isCorrect = correctCount === totalCount;
+      return {
+        task_id: taskId,
+        task_type: "gamified",
+        is_correct: isCorrect,
+        score,
+        correct_count: correctCount,
+        total_count: totalCount,
+        item_results: itemResults,
+        feedback: isCorrect
+          ? "Отличная работа! Все слова сопоставлены верно."
+          : `Вы верно сопоставили ${correctCount} из ${totalCount} слов.`,
+        should_open_tutor: !isCorrect,
+        wrong_summary: !isCorrect
+          ? `Ошибок: ${totalCount - correctCount}`
+          : null,
+        progress_id: "prog-" + Date.now(),
+      };
+    }
+
+    if (foundTask?.content?.questions && body.answers) {
+      const questions = foundTask.content.questions;
+      let correctCount = 0;
+      const itemResults = questions.map((q) => {
+        const submitted = body.answers[q.id] || "";
+        const isOk =
+          submitted.toLowerCase() === q.correct_answer.toLowerCase();
+        if (isOk) correctCount++;
+        return {
+          id: q.id,
+          is_correct: isOk,
+          submitted,
+          explanation: q.explanation,
+        };
+      });
+      const totalCount = questions.length;
+      const score = Math.round((correctCount / totalCount) * 10);
+      const isCorrect = correctCount === totalCount;
+      return {
+        task_id: taskId,
+        task_type: "test",
+        is_correct: isCorrect,
+        score,
+        correct_count: correctCount,
+        total_count: totalCount,
+        item_results: itemResults,
+        feedback: isCorrect
+          ? "Превосходно! Все ответы верны."
+          : `Верно ${correctCount} из ${totalCount}.`,
+        should_open_tutor: !isCorrect,
+        wrong_summary: !isCorrect
+          ? `Ошибок: ${totalCount - correctCount}`
+          : null,
+        progress_id: "prog-" + Date.now(),
+      };
+    }
+
     return {
+      task_id: taskId,
+      task_type: foundTask?.type || "test",
       is_correct: true,
-      score: 100,
-      xp_awarded: 25,
-      feedback: "Отличная работа! Все ответы верны.",
+      score: 10,
+      correct_count: 10,
+      total_count: 10,
+      item_results: [],
+      feedback: "Отличная работа! Задание выполнено.",
+      should_open_tutor: false,
+      wrong_summary: null,
+      progress_id: "prog-" + Date.now(),
     };
   }
 
   if (path.includes("/ai-review")) {
     return {
-      review:
-        "Вы отлично справились! Обратите внимание на контекст употребления вопросительных слов Who (кто) и Whose (чей).",
+      analysis:
+        "ИИ-разбор: Обратите внимание на ключевые контекстные признаки. Например, Who («кто») относится к одушевлённым лицам, Whose («чей») выражает принадлежность предмета человеку, а черты характера (Shy, Patient, Curious) напрямую вытекают из действий героев в описании ситуации.",
     };
   }
 
   if (path === "/api/v1/homework/evaluate") {
     return {
-      score: 95,
-      cefr_level: "A2",
-      general_feedback:
-        "Прекрасное эссе! Лексика по теме «Внешность и характер» (pigtails, freckles, polite, patient) использована точно. Грамматика Present Simple соблюдена.",
-      grammar_score: 94,
-      vocabulary_score: 98,
-      strengths: [
-        "Отличное использование активного словаря темы",
-        "Связный и последовательный текст с яркими жизненными примерами",
+      score: 9,
+      feedback:
+        "Прекрасное эссе! Лексика по теме «Внешность и характер» (pigtails, freckles, patient, polite) использована точно и к месту. Грамматика Present Simple соблюдена.",
+      errors: [
+        {
+          sentence: "He don't like waiting.",
+          correction: "He doesn't like waiting.",
+          explanation:
+            "В Present Simple с местоимениями 3-го лица единственного числа (he/she/it) используется форма doesn't.",
+        },
       ],
-      areas_for_improvement: [
-        "Обратите внимание на использование артиклей перед исчисляемыми существительными",
-      ],
-      suggested_revision: null,
     };
   }
 
@@ -136,9 +278,10 @@ function handleMockRequest(path, options = {}) {
   if (path.startsWith("/api/v1/admin/overview")) {
     return {
       total_students: 12,
-      active_today: 4,
+      total_topics: MOCK_TOPICS.length,
+      total_tasks: MOCK_TOPICS.reduce((acc, t) => acc + (t.tasks?.length || 0), 0),
       total_submissions: 38,
-      average_score: 91.5,
+      average_score: 9.5,
     };
   }
 
@@ -146,33 +289,58 @@ function handleMockRequest(path, options = {}) {
     return [
       {
         id: "sub-1",
-        student_id: "demo-student-uuid",
-        student_username: "demo_student",
+        user_id: "demo-student-uuid",
+        student_name: "demo_student",
+        student_email: "demo@example.com",
+        student_level: "A2",
+        topic_id: "1",
         topic_title: "Внешность и характер",
+        topic_level: "A2",
+        task_id: "task-1",
+        task_type: "gamified",
         task_title: "Задание 1. Соедините картинки со словами",
-        score: 100,
-        is_correct: true,
-        created_at: new Date(Date.now() - 3600000).toISOString(),
+        score: 10.0,
+        completed_at: new Date(Date.now() - 3600000).toISOString(),
+        ai_feedback: {
+          feedback: "Отличная работа! Все 12 слов сопоставлены верно.",
+        },
       },
       {
         id: "sub-2",
-        student_id: "demo-student-uuid",
-        student_username: "demo_student",
+        user_id: "demo-student-uuid",
+        student_name: "demo_student",
+        student_email: "demo@example.com",
+        student_level: "A2",
+        topic_id: "1",
         topic_title: "Внешность и характер",
+        topic_level: "A2",
+        task_id: "task-2",
+        task_type: "test",
         task_title: "Задание 2. Прочитайте ситуацию и выберите правильный ответ",
-        score: 100,
-        is_correct: true,
-        created_at: new Date(Date.now() - 1800000).toISOString(),
+        score: 10.0,
+        completed_at: new Date(Date.now() - 1800000).toISOString(),
+        ai_feedback: {
+          feedback: "Идеально! 10 из 10 ситуаций решены верно.",
+        },
       },
       {
         id: "sub-3",
-        student_id: "demo-student-uuid",
-        student_username: "demo_student",
+        user_id: "demo-student-uuid",
+        student_name: "demo_student",
+        student_email: "demo@example.com",
+        student_level: "A2",
+        topic_id: "1",
         topic_title: "Внешность и характер",
+        topic_level: "A2",
+        task_id: "task-4",
+        task_type: "essay",
         task_title: "Задание 4. Творческое эссе",
-        score: 95,
-        is_correct: true,
-        created_at: new Date(Date.now() - 900000).toISOString(),
+        score: 9.0,
+        completed_at: new Date(Date.now() - 900000).toISOString(),
+        ai_feedback: {
+          feedback:
+            "Прекрасное эссе! Лексика по теме «Внешность и характер» использована точно.",
+        },
       },
     ];
   }
@@ -184,24 +352,70 @@ function handleMockRequest(path, options = {}) {
         username: "demo_student",
         email: "demo@example.com",
         level: "A2",
-        xp: 180,
-        streak_days: 4,
-        submissions_count: 3,
+        is_first_login: false,
+        created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+        completed_count: 3,
+        average_score: 9.7,
       },
       {
         id: "student-2",
         username: "alex_learner",
         email: "alex@example.com",
         level: "A2",
-        xp: 120,
-        streak_days: 2,
-        submissions_count: 2,
+        is_first_login: false,
+        created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+        completed_count: 2,
+        average_score: 8.5,
       },
     ];
   }
 
   if (path.startsWith("/api/v1/admin/topics-with-tasks")) {
-    return MOCK_TOPICS;
+    return MOCK_TOPICS.map((t) => ({
+      topic: {
+        id: t.id,
+        title: t.title,
+        description: t.description,
+        level: t.level,
+        order: t.order,
+        video_url: t.video_url,
+        presentation_url: t.presentation_url,
+        created_at: new Date().toISOString(),
+      },
+      tasks: t.tasks || [],
+    }));
+  }
+
+  if (path === "/api/v1/topics" && method === "POST") {
+    let body = {};
+    try {
+      body = typeof options.body === "string" ? JSON.parse(options.body) : options.body || {};
+    } catch {}
+    const newTopic = {
+      id: "topic-" + Date.now(),
+      title: body.title || "Новый модуль",
+      description: body.description || "",
+      level: body.level || "A2",
+      order: MOCK_TOPICS.length + 1,
+      video_url: body.video_url || null,
+      presentation_url: body.presentation_url || null,
+      tasks: [],
+    };
+    MOCK_TOPICS.push(newTopic);
+    return newTopic;
+  }
+
+  if (path.match(/\/topics\/[^/]+\/tasks/) && method === "POST") {
+    let body = {};
+    try {
+      body = typeof options.body === "string" ? JSON.parse(options.body) : options.body || {};
+    } catch {}
+    return {
+      id: "task-" + Date.now(),
+      topic_id: "1",
+      type: body.type || "test",
+      content: body.content || {},
+    };
   }
 
   return null;

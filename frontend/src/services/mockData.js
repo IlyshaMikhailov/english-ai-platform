@@ -3,7 +3,7 @@ export const MOCK_STUDENT_USER = {
   username: "demo_student",
   email: "demo@example.com",
   level: "A2",
-  onboarding_completed: true,
+  is_first_login: false,
   is_admin: false,
   xp: 180,
   streak_days: 4,
@@ -15,12 +15,27 @@ export const MOCK_ADMIN_USER = {
   username: "admin",
   email: "admin@example.com",
   level: "C2",
-  onboarding_completed: true,
+  is_first_login: false,
   is_admin: true,
   xp: 990,
   streak_days: 15,
   created_at: new Date().toISOString(),
 };
+
+const MATCHING_PAIRS = [
+  { id: "pair-1", word: "Clever", description: "Мальчик в очках, читающий книгу", image_key: "clever" },
+  { id: "pair-2", word: "Shy", description: "Девочка, которая стеснительно смотрит вниз и прикрывает лицо руками", image_key: "shy" },
+  { id: "pair-3", word: "Polite", description: "Мальчик, который придерживает дверь для другого человека", image_key: "polite" },
+  { id: "pair-4", word: "Stubborn", description: "Ребёнок, который скрестил руки и сердито смотрит в сторону", image_key: "stubborn" },
+  { id: "pair-5", word: "Curious", description: "Девочка с увеличительным стеклом, рассматривающая бабочку", image_key: "curious" },
+  { id: "pair-6", word: "Patient", description: "Мальчик, спокойно ожидающий своей очереди", image_key: "patient" },
+  { id: "pair-7", word: "Spiky", description: "Мальчик с короткими торчащими волосами", image_key: "spiky" },
+  { id: "pair-8", word: "Well-built", description: "Спортивный мужчина с широкими плечами", image_key: "well_built" },
+  { id: "pair-9", word: "Pigtails", description: "Девочка с двумя заплетёнными хвостиками", image_key: "pigtails" },
+  { id: "pair-10", word: "Moustache", description: "Мужчина с заметными усами", image_key: "moustache" },
+  { id: "pair-11", word: "Curly", description: "Девочка с кудрявыми волосами", image_key: "curly" },
+  { id: "pair-12", word: "Freckles", description: "Ребёнок с веснушками на лице", image_key: "freckles" },
+];
 
 export const MOCK_TOPICS = [
   {
@@ -45,20 +60,16 @@ export const MOCK_TOPICS = [
           instruction:
             "Перетащите каждое английское слово на подходящую карточку с иллюстрацией (или нажмите на слово, а затем на карточку).",
           hint: "Обратите внимание на детали внешности (волосы, усы, веснушки) и действия персонажей на картинках.",
-          pairs: [
-            { id: "pair-1", word: "Clever", description: "Мальчик в очках, читающий книгу", image_key: "clever" },
-            { id: "pair-2", word: "Shy", description: "Девочка, которая стеснительно смотрит вниз и прикрывает лицо руками", image_key: "shy" },
-            { id: "pair-3", word: "Polite", description: "Мальчик, который придерживает дверь для другого человека", image_key: "polite" },
-            { id: "pair-4", word: "Stubborn", description: "Ребёнок, который скрестил руки и сердито смотрит в сторону", image_key: "stubborn" },
-            { id: "pair-5", word: "Curious", description: "Девочка с увеличительным стеклом, рассматривающая бабочку", image_key: "curious" },
-            { id: "pair-6", word: "Patient", description: "Мальчик, спокойно ожидающий своей очереди", image_key: "patient" },
-            { id: "pair-7", word: "Spiky", description: "Мальчик с короткими торчащими волосами", image_key: "spiky" },
-            { id: "pair-8", word: "Well-built", description: "Спортивный мужчина с широкими плечами", image_key: "well_built" },
-            { id: "pair-9", word: "Pigtails", description: "Девочка с двумя заплетёнными хвостиками", image_key: "pigtails" },
-            { id: "pair-10", word: "Moustache", description: "Мужчина с заметными усами", image_key: "moustache" },
-            { id: "pair-11", word: "Curly", description: "Девочка с кудрявыми волосами", image_key: "curly" },
-            { id: "pair-12", word: "Freckles", description: "Ребёнок с веснушками на лице", image_key: "freckles" },
+          cards: MATCHING_PAIRS.map((p) => ({
+            id: p.id,
+            description: p.description,
+            image_key: p.image_key,
+          })),
+          words: [
+            "Clever", "Curly", "Curious", "Freckles", "Moustache", "Patient",
+            "Pigtails", "Polite", "Shy", "Spiky", "Stubborn", "Well-built"
           ],
+          pairs: MATCHING_PAIRS,
         },
       },
       {
