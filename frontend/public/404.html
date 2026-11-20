@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>LinguaAI</title>
+    <script>
+      // SPA redirect for GitHub Pages
+      var path = window.location.pathname;
+      var segments = path.split('/').filter(Boolean);
+      var repo = segments[0] || '';
+      var subpath = segments.slice(1).join('/');
+      var target = window.location.protocol + '//' + window.location.host + '/' + repo + '/#/' + subpath + window.location.search;
+      window.location.replace(target);
+    </script>
+  </head>
+  <body>
+    <p>Перенаправление на LinguaAI...</p>
+  </body>
+</html>
